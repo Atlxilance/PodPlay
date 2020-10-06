@@ -47,9 +47,8 @@ class PodcastRepo(private var feedService: FeedService) {
         val description = if (rssResponse.description == "")
             rssResponse.summary else rssResponse.description
 // 3
-        return Podcast(feedUrl, rssResponse.title, description,
-            imageUrl,
-            rssResponse.lastUpdated, episodes =
-            rssItemsToEpisodes(items))
+        return Podcast(null, feedUrl, rssResponse.title, description,
+            imageUrl, rssResponse.lastUpdated,
+            episodes = rssItemsToEpisodes(items))
     }
 }
