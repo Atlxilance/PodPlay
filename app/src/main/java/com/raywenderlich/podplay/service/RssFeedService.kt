@@ -32,6 +32,11 @@ class RssFeedService: FeedService {
                         val dbFactory = DocumentBuilderFactory.newInstance()
                         val dBuilder = dbFactory.newDocumentBuilder()
                         val doc = dBuilder.parse(responseBody.byteStream())
+                        val rssFeedResponse = RssFeedResponse(episodes =
+                        mutableListOf())
+                        domToRssFeedResponse(doc, rssFeedResponse)
+                        callBack(rssFeedResponse)
+                        println(rssFeedResponse)
                         return
                     }
                 }
@@ -61,6 +66,32 @@ class RssFeedService: FeedService {
                     add(RssFeedResponse.EpisodeResponse())
                     "pubDate" -> rssFeedResponse.lastUpdated =
                         DateUtils.xmlDateToDate(node.textContent)
+                }
+            }
+            // 1
+            val grandParentName = node.parentNode.parentNode?.nodeName ?: ""
+// 2
+            if (parentName == "item" && grandParentName == "channel") {
+// 3
+                val currentItem = rssFeedResponse.episodes?.last()
+                if (currentItem != null) {
+// 4
+                    when (nodeName) {
+                        "title" -> currentItem.title = node.textContent
+                        "description" -> currentItem.description =
+                            node.textContent
+                        "itunes:duration" -> currentItem.duration =
+                            node.textContent
+                        "guid" -> currentItem.guid = node.textContent
+                        "pubDate" -> currentItem.pubDate = node.textContent
+                        "link" -> currentItem.link = node.textContent
+                        "enclosure" -> {
+                            currentItem.url = node.attributes.getNamedItem("url")
+                                .textContent
+                            currentItem.type = node.attributes.getNamedItem("type")
+                                .textContent
+                        }
+                    }
                 }
             }
         }

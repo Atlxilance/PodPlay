@@ -29,4 +29,10 @@ object DateUtils {
             Locale.getDefault())
         return inFormat.parse(date) ?: Date()
     }
+
+    fun dateToShortDate(date: Date): String {
+        val outputFormat = DateFormat.getDateInstance(
+            DateFormat.SHORT, Locale.getDefault())
+        return outputFormat.format(date)
+    }
 }
