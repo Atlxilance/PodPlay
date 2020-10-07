@@ -5,6 +5,7 @@ apply plugin: 'kotlin-android-extensions'
 android {
     compileSdkVersion 29
     buildToolsVersion "30.0.2"
+    apply plugin: 'kotlin-kapt'
 
     defaultConfig {
         applicationId "com.raywenderlich.podplay"

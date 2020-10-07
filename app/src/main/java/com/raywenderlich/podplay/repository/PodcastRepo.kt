@@ -1,5 +1,7 @@
 package com.raywenderlich.podplay.repository
 
+import androidx.lifecycle.LiveData
+import com.raywenderlich.podplay.db.PodcastDao
 import com.raywenderlich.podplay.model.Episode
 import com.raywenderlich.podplay.model.Podcast
 import com.raywenderlich.podplay.service.FeedService
@@ -10,25 +12,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 
-class PodcastRepo(private var feedService: FeedService) {
-    fun getPodcast(feedUrl: String,
-                   callback: (Podcast?) -> Unit) {
-        feedService.getFeed(feedUrl) { feedResponse ->
-            var podcast: Podcast? = null
-            if (feedResponse != null) {
-                podcast = rssResponseToPodcast(feedUrl, "", feedResponse)
-            }
-            GlobalScope.launch(Dispatchers.Main) {
-                callback(podcast)
-            }
-        }
-    }
+class PodcastRepo(private var feedService: FeedService,
+                  private var podcastDao: PodcastDao) {
 
     private fun rssItemsToEpisodes(episodeResponses:
                                    List<RssFeedResponse.EpisodeResponse>): List<Episode> {
         return episodeResponses.map {
             Episode(
                 it.guid ?: "",
+                null,
                 it.title ?: "",
                 it.description ?: "",
                 it.url ?: "",
@@ -51,4 +43,51 @@ class PodcastRepo(private var feedService: FeedService) {
             imageUrl, rssResponse.lastUpdated,
             episodes = rssItemsToEpisodes(items))
     }
+
+    fun getPodcast(feedUrl: String,
+                   callback: (Podcast?) -> Unit) {
+        GlobalScope.launch {
+            val podcast = podcastDao.loadPodcast(feedUrl)
+            if (podcast != null) {
+                podcast.id?.let {
+                    podcast.episodes = podcastDao.loadEpisodes(it)
+                    GlobalScope.launch(Dispatchers.Main) {
+                        callback(podcast)
+                    }
+                }
+            } else {
+                feedService.getFeed(feedUrl) { feedResponse ->
+                    var podcast: Podcast? = null
+                    if (feedResponse != null) {
+                        podcast = rssResponseToPodcast(feedUrl, "", feedResponse)
+                    }
+                    GlobalScope.launch(Dispatchers.Main) {
+                        callback(podcast)
+                    }
+                }
+            }
+        }
+    fun save(podcast: Podcast) {
+        GlobalScope.launch {
+// 1
+            val podcastId = podcastDao.insertPodcast(podcast)
+// 2
+            for (episode in podcast.episodes) {
+// 3
+                episode.podcastId = podcastId
+                podcastDao.insertEpisode(episode)
+            }
+        }
+    }
+
+    fun getAll(): LiveData<List<Podcast>>
+    {
+        return podcastDao.loadPodcasts()
+    }
+
+        fun delete(podcast: Podcast) {
+            GlobalScope.launch {
+                podcastDao.deletePodcast(podcast)
+            }
+        }
 }

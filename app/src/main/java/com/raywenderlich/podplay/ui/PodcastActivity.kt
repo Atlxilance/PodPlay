@@ -12,10 +12,12 @@ import android.view.View
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
+import androidx.lifecycle.Observer
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.raywenderlich.podplay.R
 import com.raywenderlich.podplay.adapter.PodcastListAdapter
+import com.raywenderlich.podplay.db.PodPlayDatabase
 import com.raywenderlich.podplay.repository.ItunesRepo
 import com.raywenderlich.podplay.repository.PodcastRepo
 import com.raywenderlich.podplay.service.FeedService
@@ -24,7 +26,9 @@ import com.raywenderlich.podplay.viewmodel.PodcastViewModel
 import com.raywenderlich.podplay.viewmodel.SearchViewModel
 import kotlinx.android.synthetic.main.activity_podcast.*
 
-class PodcastActivity : AppCompatActivity(), PodcastListAdapter.PodcastListAdapterListener {
+class PodcastActivity : AppCompatActivity(),
+    PodcastListAdapter.PodcastListAdapterListener,
+    PodcastDetailsFragment.OnPodcastDetailsListener {
 
     private lateinit var searchMenuItem: MenuItem
     private val TAG = javaClass.simpleName
@@ -38,6 +42,7 @@ class PodcastActivity : AppCompatActivity(), PodcastListAdapter.PodcastListAdapt
         setupToolbar()
         setupViewModels()
         updateControls()
+        setupPodcastListView()
         handleIntent(intent)
         addBackStackListener()
     }
@@ -93,7 +98,10 @@ class PodcastActivity : AppCompatActivity(), PodcastListAdapter.PodcastListAdapt
         val service = ItunesService.instance
         searchViewModel.iTunesRepo = ItunesRepo(service)
         val rssService = FeedService.instance
-        podcastViewModel.podcastRepo = PodcastRepo(rssService)
+        val db = PodPlayDatabase.getInstance(this)
+        val podcastDao = db.podcastDao()
+        podcastViewModel.podcastRepo = PodcastRepo(rssService,
+            podcastDao)
     }
 
     private fun updateControls() {
@@ -177,6 +185,35 @@ class PodcastActivity : AppCompatActivity(), PodcastListAdapter.PodcastListAdapt
                 podcastRecyclerView.visibility = View.VISIBLE
             }
         }
+    }
+
+    override fun onSubscribe() {
+        podcastViewModel.saveActivePodcast()
+        supportFragmentManager.popBackStack()
+    }
+
+    private fun showSubscribedPodcasts()
+    {
+// 1
+        val podcasts = podcastViewModel.getPodcasts()?.value
+// 2
+        if (podcasts != null) {
+            toolbar.title = getString(R.string.subscribed_podcasts)
+            podcastListAdapter.setSearchData(podcasts)
+        }
+    }
+
+    private fun setupPodcastListView() {
+        podcastViewModel.getPodcasts()?.observe(this, Observer {
+            if (it != null) {
+                showSubscribedPodcasts()
+            }
+        })
+    }
+
+    override fun onUnsubscribe() {
+        podcastViewModel.deleteActivePodcast()
+        supportFragmentManager.popBackStack()
     }
 
     companion object {
