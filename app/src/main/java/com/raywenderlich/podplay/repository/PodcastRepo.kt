@@ -15,8 +15,10 @@ import kotlinx.coroutines.launch
 class PodcastRepo(private var feedService: FeedService,
                   private var podcastDao: PodcastDao) {
 
-    private fun rssItemsToEpisodes(episodeResponses:
-                                   List<RssFeedResponse.EpisodeResponse>): List<Episode> {
+    private fun rssItemsToEpisodes(
+        episodeResponses:
+        List<RssFeedResponse.EpisodeResponse>
+    ): List<Episode> {
         return episodeResponses.map {
             Episode(
                 it.guid ?: "",
@@ -31,21 +33,27 @@ class PodcastRepo(private var feedService: FeedService,
         }
     }
 
-    private fun rssResponseToPodcast(feedUrl: String, imageUrl:
-    String, rssResponse: RssFeedResponse): Podcast? {
+    private fun rssResponseToPodcast(
+        feedUrl: String, imageUrl:
+        String, rssResponse: RssFeedResponse
+    ): Podcast? {
 // 1
         val items = rssResponse.episodes ?: return null
 // 2
         val description = if (rssResponse.description == "")
             rssResponse.summary else rssResponse.description
 // 3
-        return Podcast(null, feedUrl, rssResponse.title, description,
+        return Podcast(
+            null, feedUrl, rssResponse.title, description,
             imageUrl, rssResponse.lastUpdated,
-            episodes = rssItemsToEpisodes(items))
+            episodes = rssItemsToEpisodes(items)
+        )
     }
 
-    fun getPodcast(feedUrl: String,
-                   callback: (Podcast?) -> Unit) {
+    fun getPodcast(
+        feedUrl: String,
+        callback: (Podcast?) -> Unit
+    ) {
         GlobalScope.launch {
             val podcast = podcastDao.loadPodcast(feedUrl)
             if (podcast != null) {
@@ -67,6 +75,8 @@ class PodcastRepo(private var feedService: FeedService,
                 }
             }
         }
+    }
+
     fun save(podcast: Podcast) {
         GlobalScope.launch {
 // 1
@@ -80,14 +90,83 @@ class PodcastRepo(private var feedService: FeedService,
         }
     }
 
-    fun getAll(): LiveData<List<Podcast>>
-    {
+    fun getAll(): LiveData<List<Podcast>> {
         return podcastDao.loadPodcasts()
     }
 
-        fun delete(podcast: Podcast) {
-            GlobalScope.launch {
-                podcastDao.deletePodcast(podcast)
+    fun delete(podcast: Podcast) {
+        GlobalScope.launch {
+            podcastDao.deletePodcast(podcast)
+        }
+    }
+
+    private fun getNewEpisodes(localPodcast: Podcast, callBack:
+        (List<Episode>) -> Unit) {
+// 1
+        feedService.getFeed(localPodcast.feedUrl) { response ->
+            if (response != null) {
+// 2
+                val remotePodcast =
+                    rssResponseToPodcast(localPodcast.feedUrl,
+                        localPodcast.imageUrl, response)
+                remotePodcast?.let {
+// 3
+                    val localEpisodes =
+                        podcastDao.loadEpisodes(localPodcast.id!!)
+// 4
+                    val newEpisodes = remotePodcast.episodes.filter { episode ->
+                        localEpisodes.find {
+                            episode.guid == it.guid
+                        } == null
+                    }
+// 5
+                    callBack(newEpisodes)
+                }
+            } else {
+                callBack(listOf())
             }
         }
+    }
+
+    private fun saveNewEpisodes(podcastId: Long, episodes:
+    List<Episode>) {
+        GlobalScope.launch {
+            for (episode in episodes) {
+                episode.podcastId = podcastId
+                podcastDao.insertEpisode(episode)
+            }
+        }
+    }
+
+    class PodcastUpdateInfo (val feedUrl: String, val name: String,
+                             val newCount: Int)
+
+    fun updatePodcastEpisodes(callback: (List<PodcastUpdateInfo>) ->
+    Unit) {
+// 1
+        val updatedPodcasts: MutableList<PodcastUpdateInfo> =
+            mutableListOf()
+// 2
+        val podcasts = podcastDao.loadPodcastsStatic()
+// 3
+        var processCount = podcasts.count()
+// 4
+        for (podcast in podcasts) {
+// 5
+            getNewEpisodes(podcast) { newEpisodes ->
+// 6
+                if (newEpisodes.count() > 0) {
+                    saveNewEpisodes(podcast.id!!, newEpisodes)
+                    updatedPodcasts.add(PodcastUpdateInfo(podcast.feedUrl,
+                        podcast.feedTitle, newEpisodes.count()))
+                }
+// 7
+                processCount--
+                if (processCount == 0) {
+// 8
+                    callback(updatedPodcasts)
+                }
+            }
+        }
+    }
 }

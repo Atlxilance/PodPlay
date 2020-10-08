@@ -12,6 +12,8 @@ import java.util.*
 
 class PodcastViewModel(application: Application) :
     AndroidViewModel(application) {
+
+    var activeEpisodeViewData: EpisodeViewData? = null
     var livePodcastData: LiveData<List<SearchViewModel.PodcastSummaryViewData>>? =
         null
     private var activePodcast: Podcast? = null
@@ -31,14 +33,16 @@ class PodcastViewModel(application: Application) :
         var description: String? = "",
         var mediaUrl: String? = "",
         var releaseDate: Date? = null,
-        var duration: String? = ""
+        var duration: String? = "",
+        var isVideo: Boolean = false
     )
 
     private fun episodesToEpisodesView(episodes: List<Episode>):
             List<EpisodeViewData> {
         return episodes.map {
+            val isVideo = it.mimeType.startsWith("video")
             EpisodeViewData(it.guid, it.title, it.description,
-                it.mediaUrl, it.releaseDate, it.duration)
+                it.mediaUrl, it.releaseDate, it.duration, isVideo)
         }
     }
 
@@ -81,6 +85,7 @@ class PodcastViewModel(application: Application) :
     fun saveActivePodcast() {
         val repo = podcastRepo ?: return
         activePodcast?.let {
+            it.episodes = it.episodes.drop(1)
             repo.save(it)
         }
     }
@@ -117,6 +122,20 @@ class PodcastViewModel(application: Application) :
         val repo = podcastRepo ?: return
         activePodcast?.let {
             repo.delete(it)
+        }
+    }
+
+    fun setActivePodcast(feedUrl: String, callback:
+        (SearchViewModel.PodcastSummaryViewData?) -> Unit) {
+        val repo = podcastRepo ?: return
+        repo.getPodcast(feedUrl) {
+            if (it == null) {
+                callback(null)
+            } else {
+                activePodcastViewData = podcastToPodcastView(it)
+                activePodcast = it
+                callback(podcastToSummaryView(it))
+            }
         }
     }
 }

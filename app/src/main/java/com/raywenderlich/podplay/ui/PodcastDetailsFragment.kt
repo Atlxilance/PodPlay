@@ -1,20 +1,30 @@
 package com.raywenderlich.podplay.ui
 
+import android.content.ComponentName
 import android.content.Context
+import android.net.Uri
 import android.os.Bundle
+import android.support.v4.media.MediaBrowserCompat
+import android.support.v4.media.MediaMetadataCompat
+import android.support.v4.media.session.MediaControllerCompat
+import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.PlaybackStateCompat
 import android.text.method.ScrollingMovementMethod
 import android.view.*
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.activityViewModels
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.raywenderlich.podplay.R
 import com.raywenderlich.podplay.adapter.EpisodeListAdapter
+import com.raywenderlich.podplay.service.PodplayMediaService
 import com.raywenderlich.podplay.viewmodel.PodcastViewModel
 import kotlinx.android.synthetic.main.fragment_podcast_details.*
 
-class PodcastDetailsFragment : Fragment() {
+class PodcastDetailsFragment : Fragment(),
+    EpisodeListAdapter.EpisodeListAdapterListener {
 
     private var menuItem: MenuItem? = null
     private var listener: OnPodcastDetailsListener? = null
@@ -71,8 +81,10 @@ class PodcastDetailsFragment : Fragment() {
             episodeRecyclerView.context, layoutManager.orientation)
         episodeRecyclerView.addItemDecoration(dividerItemDecoration)
 // 3
-        episodeListAdapter = EpisodeListAdapter(
-            podcastViewModel.activePodcastViewData?.episodes)
+        episodeListAdapter =
+            EpisodeListAdapter(
+                podcastViewModel.activePodcastViewData?.episodes,
+                this)
         episodeRecyclerView.adapter = episodeListAdapter
     }
 
@@ -85,6 +97,7 @@ class PodcastDetailsFragment : Fragment() {
     interface OnPodcastDetailsListener {
         fun onUnsubscribe()
         fun onSubscribe()
+        fun onShowEpisodePlayer(episodeViewData: PodcastViewModel.EpisodeViewData)
     }
 
     override fun onAttach(context: Context) {
@@ -122,5 +135,19 @@ class PodcastDetailsFragment : Fragment() {
         menuItem?.title = if (viewData.subscribed)
             getString(R.string.unsubscribe) else
             getString(R.string.subscribe)
+    }
+
+    override fun onStart() {
+        super.onStart()
+    }
+
+    override fun onStop() {
+        super.onStop()
+    }
+
+    override fun onSelectedEpisode(episodeViewData: PodcastViewModel.EpisodeViewData)
+    {
+// 1
+        listener?.onShowEpisodePlayer(episodeViewData)
     }
 }
